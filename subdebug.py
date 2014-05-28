@@ -18,10 +18,15 @@ class SubDebugHandler(asyncore.dispatcher):
 		asyncore.dispatcher.__init__(self, socket)
 		msg_queue.put(b"STEP\n")
 
+	# Reads the message-code of incomming messages and passes 
+	# them to the right function
 	def handle_read(self):
 		data = self.recv(BUFFER_SIZE)
 		if data:
 			print("Received: ", data)
+			split = data.split()
+			if split[0] in message_parsers:
+				message_parsers[split[0]](split)
 
 	def handle_write(self):
 		if not msg_queue.empty():
@@ -64,6 +69,27 @@ class StepCommand(sublime_plugin.WindowCommand):
 		print("Stepping to next line...")
 		msg_queue.put(b"STEP\n")
 
+
+#=========Incomming message parsers=========#
+
+# Called when the "202 Paused" message is received
+def paused_command(args):
+	reg = sublime.Region(int(args[3]), int(args[3]))
+	views = [v for v in sum([w.views() for w in sublime.windows()], [])]
+		#name = v.file_name().split("\\")
+	views = [v for v in views if v.file_name().split("\\")[-1] == args[2].decode("utf-8")]
+	print(len(views))
+
+	#view = [v for v in sum([w.views() for w in sublime.windows()], []) if v.name() == args[2].decode("utf-8")]
+
+	views[0].add_regions("test", [reg], "keyword", "dot")
+
+# Mapping from incomming messages to the functions that parse them
+message_parsers = { 
+	b"202": paused_command,
+}
+
+#===========================================#
 
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
