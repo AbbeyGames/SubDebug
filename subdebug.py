@@ -46,7 +46,6 @@ class SubDebugServer(asyncore.dispatcher):
 			(conn_sock, client_address) = pair
 			print("Incoming connection: ", client_address)
 			SubDebugHandler(conn_sock)
-			#conn_sock.send(b"STEP\n")
 
 	def handle_close(self):
 		print("Closing server.")
