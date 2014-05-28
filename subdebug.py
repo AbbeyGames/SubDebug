@@ -74,15 +74,14 @@ class StepCommand(sublime_plugin.WindowCommand):
 
 # Called when the "202 Paused" message is received
 def paused_command(args):
-	reg = sublime.Region(int(args[3]), int(args[3]))
+	# Get all views
 	views = [v for v in sum([w.views() for w in sublime.windows()], [])]
-		#name = v.file_name().split("\\")
+	# Check which views have the same name as the paused file
 	views = [v for v in views if v.file_name().split("\\")[-1] == args[2].decode("utf-8")]
-	print(len(views))
-
-	#view = [v for v in sum([w.views() for w in sublime.windows()], []) if v.name() == args[2].decode("utf-8")]
-
-	views[0].add_regions("test", [reg], "keyword", "dot")
+	# Select the line at column 0
+	reg = sublime.Region(views[0].text_point(int(args[3])-1, 0))
+	# Add a pink arrow to it
+	views[0].add_regions("test", [reg], "keyword", "bookmark")
 
 # Mapping from incomming messages to the functions that parse them
 message_parsers = { 
