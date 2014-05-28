@@ -1,14 +1,17 @@
+# Main entry point for the plugin.
+# Author: Yuri van Geffen
+
 import sublime, sublime_plugin
 
 import queue
 import asyncore
 import socket
-import threading
 
 TCP_IP = '127.0.0.1'
 TCP_PORT = 8172
 BUFFER_SIZE = 1024
 
+# Handles incoming and outgoing messages for the MobDebug client
 class SubDebugHandler(asyncore.dispatcher):
 	def __init__(self, socket):
 		asyncore.dispatcher.__init__(self, socket)
@@ -28,7 +31,8 @@ class SubDebugHandler(asyncore.dispatcher):
 	def handle_error(self):
 		raise
 
-
+# Starts listening on TCP_PORT and accepts incoming connections
+# before passing them to an instance of SubDebugHandler
 class SubDebugServer(asyncore.dispatcher):
 
 	def __init__(self, host, port):
@@ -54,8 +58,9 @@ class SubDebugServer(asyncore.dispatcher):
 	def handle_error(self):
 		self.close()
 
+# Open a threadsafe message queue
 msg_queue = queue.Queue()
+
+# Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
 asyncore.loop()
-
-		
