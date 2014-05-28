@@ -3,6 +3,7 @@
 
 import sublime, sublime_plugin
 
+import threading
 import queue
 import asyncore
 import socket
@@ -43,7 +44,6 @@ class SubDebugServer(asyncore.dispatcher):
 		self.listen(1)
 		print("Started listening on: ", host, ":", port)
 
-
 	def handle_accept(self):
 		pair = self.accept()
 		if pair is not None:
@@ -58,9 +58,17 @@ class SubDebugServer(asyncore.dispatcher):
 	def handle_error(self):
 		self.close()
 
+# Lets the user step to the next line
+class StepCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		print("Stepping to next line...")
+		msg_queue.put(b"STEP\n")
+
+
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
 
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
-asyncore.loop()
+thread = threading.Thread(target=asyncore.loop)
+thread.start()
