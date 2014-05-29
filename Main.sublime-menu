@@ -1,0 +1,31 @@
+[
+	{
+		"caption": "Debug",
+		"mnemonic": "D",
+		"id": "debug_menu",
+		"children":
+		[
+			{ 
+				"command": "run",
+				"caption": "Run until Breakpoint",
+				"mnemonic": "R"
+			},
+			{ 
+				"command": "step",
+				"caption": "Step to Next Line",
+				"mnemonic": "S"
+			}
+
+
+		]
+	}
+
+
+
+
+
+
+
+
+
+]

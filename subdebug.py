@@ -63,6 +63,12 @@ class SubDebugServer(asyncore.dispatcher):
 	def handle_error(self):
 		self.close()
 
+# Lets the user run the script (until breakpoint)
+class RunCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		print("Running until breakpoint...")
+		msg_queue.put(b"RUN\n")
+
 # Lets the user step to the next line
 class StepCommand(sublime_plugin.WindowCommand):
 	def run(self):
@@ -78,10 +84,12 @@ def paused_command(args):
 	views = [v for v in sum([w.views() for w in sublime.windows()], [])]
 	# Check which views have the same name as the paused file
 	views = [v for v in views if v.file_name().split("\\")[-1] == args[2].decode("utf-8")]
-	# Select the line at column 0
-	reg = sublime.Region(views[0].text_point(int(args[3])-1, 0))
-	# Add a pink arrow to it
-	views[0].add_regions("test", [reg], "keyword", "bookmark")
+	
+	if len(views) > 0:
+		# Select the line at column 0
+		reg = sublime.Region(views[0].text_point(int(args[3])-1, 0))
+		# Add a pink arrow to it
+		views[0].add_regions("test", [reg], "keyword", "bookmark")
 
 # Mapping from incomming messages to the functions that parse them
 message_parsers = { 
