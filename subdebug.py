@@ -98,8 +98,54 @@ message_parsers = {
 
 #===========================================#
 
+
+class StateHandler():
+
+	# Initiates object by checking which views are available and 
+	# clearing the state
+	def __init__(self):
+		self.update_views()
+		self.clear_state()
+
+	def clear_state(self):
+		self.state = {
+			"breakpoints": [],
+			"line_marker": None,
+		}
+		self.update_regions()
+
+	# Gets all available views in sublime
+	def update_views(self):
+		views = [v for v in sum([w.views() for w in sublime.windows()], [])]
+		self.views = {v.file_name().split("\\")[-1]:v for v in views}
+
+	# Updates all views with the available state-objects using the
+	# assigned functions
+	def update_regions(self):
+		for k,v in self.state.items():
+			if k in self.update_funcs:
+				self.update_funcs[k](self)
+
+	def update_breakpoints(self):
+		for point in self.state["breakpoints"]:
+			regions = []
+			if point[0] in state.views:
+				regions += sublime.Region(views[point[0]].text_point(point[1]-1, 0))
+		
+			
+	state = {}
+	views = {}
+	update_funcs = {
+		"breakpoints": update_breakpoints,
+		#"line_marker": update_line_marker,
+	}
+
+
+
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
+
+state_handler = StateHandler()
 
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
