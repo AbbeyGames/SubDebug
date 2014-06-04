@@ -147,13 +147,15 @@ class StateHandler():
 		self.add_missing_views()
 		if view_name in self.views:
 			self.state.setdefault(view_name, [])
-			self.state[view_name] = [("line_marker", line_number)]
+			self.state[view_name] = [(k,v) for k, v in self.state[view_name] if k != "line_marker"]
+			self.state[view_name].append(("line_marker", line_number))
 			self.update_regions()
 
 	def set_breakpoint(self, view_name, line_number):
 		self.add_missing_views()
 		if view_name in self.views:
-			self.state[view_name] = [("breakpoint", line_number)]
+			self.state.setdefault(view_name, [])
+			self.state[view_name].append(("breakpoint", line_number))
 			self.update_regions()
 		
 	views = {}

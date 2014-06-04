@@ -1,0 +1,14 @@
+[
+	{ 
+		"keys": ["ctrl+f5"], 
+		"command": "run"
+	},
+	{ 
+		"keys": ["ctrl+f6"], 
+		"command": "step"
+	},
+	{ 
+		"keys": ["ctrl+f8"], 
+		"command": "set_breakpoint"
+	},
+]
