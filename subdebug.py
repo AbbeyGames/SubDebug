@@ -75,27 +75,28 @@ class StepCommand(sublime_plugin.WindowCommand):
 		print("Stepping to next line...")
 		msg_queue.put(b"STEP\n")
 
+# Lets the user step to the next line
+class SetBreakpointCommand(sublime_plugin.TextCommand):
+	def run(self, edit):
+		#view = sublime.Window.active_view(sublime.active_window())
+		view_name = self.view.file_name().split("\\")[-1]
+		row,_ = self.view.rowcol(self.view.sel()[0].begin())
+		print("Setting breakpoint...")
+		msg_queue.put("SETB {0} {1}\n".format(view_name, row + 1).encode('latin-1'))
+		state_handler.set_breakpoint(view_name, row + 1)
+
 
 #=========Incomming message parsers=========#
-
 # Called when the "202 Paused" message is received
 def paused_command(args):
-	# Get all views
-	views = [v for v in sum([w.views() for w in sublime.windows()], [])]
-	# Check which views have the same name as the paused file
-	views = [v for v in views if v.file_name().split("\\")[-1] == args[2].decode("utf-8")]
-	
-	if len(views) > 0:
-		# Select the line at column 0
-		reg = sublime.Region(views[0].text_point(int(args[3])-1, 0))
-		# Add a pink arrow to it
-		views[0].add_regions("test", [reg], "keyword", "bookmark")
+	print(args[2])
+	print(args[3])
+	state_handler.set_line_marker(args[2].decode("utf-8"), int(args[3]))
 
 # Mapping from incomming messages to the functions that parse them
 message_parsers = { 
 	b"202": paused_command,
 }
-
 #===========================================#
 
 
@@ -104,43 +105,63 @@ class StateHandler():
 	# Initiates object by checking which views are available and 
 	# clearing the state
 	def __init__(self):
-		self.update_views()
 		self.clear_state()
+		self.update_regions()
 
 	def clear_state(self):
 		self.state = {
-			"breakpoints": [],
-			"line_marker": None,
+			#"client.lua": [("breakpoint", 6)],
 		}
-		self.update_regions()
+		self.add_missing_views()
 
-	# Gets all available views in sublime
-	def update_views(self):
+	# Gets all available views in sublime and adds the missing ones to the state
+	def add_missing_views(self):
 		views = [v for v in sum([w.views() for w in sublime.windows()], [])]
 		self.views = {v.file_name().split("\\")[-1]:v for v in views}
+		for view_name, view in self.views.items():
+			if view_name not in self.state:
+				self.state[view_name] = []
 
 	# Updates all views with the available state-objects using the
 	# assigned functions
 	def update_regions(self):
-		for k,v in self.state.items():
-			if k in self.update_funcs:
-				self.update_funcs[k](self)
 
-	def update_breakpoints(self):
-		for point in self.state["breakpoints"]:
-			regions = []
-			if point[0] in state.views:
-				regions += sublime.Region(views[point[0]].text_point(point[1]-1, 0))
-		
+		# Iterate over all files in the state
+		for view_name,regions in self.state.items():
+			# Remove all old regions
+			for reg_type_name in self.region_types:
+				self.views[view_name].erase_regions(reg_type_name)
+
+			region_sets = {}
+			# Iterate over all regions in that file
+			for (reg_type,line) in regions:
+				if reg_type not in region_sets:
+					region_sets[reg_type] = []
+				region_sets[reg_type].append(sublime.Region(self.views[view_name].text_point(line-1, 0)))
 			
-	state = {}
+			# Register the new regions with sublime
+			for reg_name,v in region_sets.items():
+				self.views[view_name].add_regions(reg_name, v, *self.region_types[reg_name])
+
+	def set_line_marker(self, view_name, line_number):
+		self.add_missing_views()
+		if view_name in self.views:
+			self.state.setdefault(view_name, [])
+			self.state[view_name] = [("line_marker", line_number)]
+			self.update_regions()
+
+	def set_breakpoint(self, view_name, line_number):
+		self.add_missing_views()
+		if view_name in self.views:
+			self.state[view_name] = [("breakpoint", line_number)]
+			self.update_regions()
+		
 	views = {}
-	update_funcs = {
-		"breakpoints": update_breakpoints,
-		#"line_marker": update_line_marker,
+	state = {}
+	region_types = {
+		"breakpoint": ("keyword", "circle"),
+		"line_marker": ("keyword", "bookmark"),
 	}
-
-
 
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
