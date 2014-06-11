@@ -165,6 +165,10 @@ class StateHandler():
 		"line_marker": ("keyword", "bookmark"),
 	}
 
+def plugin_unloaded():
+	print("Closing down the server...")
+	server.close()
+
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
 
@@ -172,5 +176,5 @@ state_handler = StateHandler()
 
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
-thread = threading.Thread(target=asyncore.loop)
+thread = threading.Thread(target=asyncore.loop, kwargs={"use_poll": True})
 thread.start()
