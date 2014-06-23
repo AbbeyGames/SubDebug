@@ -7,32 +7,49 @@ import threading
 import queue
 import asyncore
 import socket
+import time
 
 TCP_IP = '127.0.0.1'
 TCP_PORT = 8172
 BUFFER_SIZE = 1024
 
+ID = 0
+
 # Handles incoming and outgoing messages for the MobDebug client
 class SubDebugHandler(asyncore.dispatcher):
 	def __init__(self, socket):
+		global ID
+		ID = ID + 1
+		self.ID = ID
 		asyncore.dispatcher.__init__(self, socket)
 		msg_queue.put(b"STEP\n")
+		breakpoints = state_handler.breakpoints()
+		print(ID, "Amount of breakpoints: ", len(breakpoints))
+		for (view_name,row) in breakpoints:
+			#print("Sending state: ", view_name, row)
+			msg_queue.put("SETB {0} {1}\n".format(view_name, row + 1).encode('latin-1'))
+
 
 	# Reads the message-code of incomming messages and passes 
 	# them to the right function
 	def handle_read(self):
 		data = self.recv(BUFFER_SIZE)
 		if data:
-			print("Received: ", data)
+			print(ID, "Received: ", data)
 			split = data.split()
 			if split[0] in message_parsers:
 				message_parsers[split[0]](split)
 
 	def handle_write(self):
 		if not msg_queue.empty():
+
 			msg = msg_queue.get()
-			print("Sending: ", msg)
+			print(ID, "Sending: ", msg)
 			self.send(msg)
+
+	def handle_close(self):
+		print(ID, "Henkiespankie")
+		self.close()
 
 	def handle_error(self):
 		raise
@@ -54,6 +71,7 @@ class SubDebugServer(asyncore.dispatcher):
 		if pair is not None:
 			(conn_sock, client_address) = pair
 			print("Incoming connection: ", client_address)
+			ID = ID + 1
 			SubDebugHandler(conn_sock)
 
 	def handle_close(self):
@@ -61,7 +79,9 @@ class SubDebugServer(asyncore.dispatcher):
 		self.close()
 
 	def handle_error(self):
+		print("Error in server, closing.")
 		self.close()
+		raise
 
 # Lets the user run the script (until breakpoint)
 class RunCommand(sublime_plugin.WindowCommand):
@@ -157,6 +177,16 @@ class StateHandler():
 			self.state.setdefault(view_name, [])
 			self.state[view_name].append(("breakpoint", line_number))
 			self.update_regions()
+
+	def breakpoints(self):
+		ret = []
+		for k,v in self.state.items():
+			for t in v:
+				if t[0] == "breakpoint":
+					ret.append((k,t[1]))
+		return ret
+
+		
 		
 	views = {}
 	state = {}
@@ -172,5 +202,5 @@ state_handler = StateHandler()
 
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
-thread = threading.Thread(target=asyncore.loop)
+thread = threading.Thread(target=asyncore.loop)#, kwargs={'timeout':1}#)
 thread.start()
