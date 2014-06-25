@@ -14,16 +14,19 @@ BUFFER_SIZE = 1024
 
 # Handles incoming and outgoing messages for the MobDebug client
 class SubDebugHandler(asyncore.dispatcher):
-	def __init__(self, socket):
+	def __init__(self, socket, handler_id):
 		asyncore.dispatcher.__init__(self, socket)
+		self.handler_id = handler_id
 		msg_queue.put(b"STEP\n")
+		for view_name,row in state_handler.breakpoints():
+			msg_queue.put("SETB {0} {1}\n".format(view_name, row).encode('latin-1'))
 
 	# Reads the message-code of incomming messages and passes 
 	# them to the right function
 	def handle_read(self):
 		data = self.recv(BUFFER_SIZE)
 		if data:
-			print("Received: ", data)
+			print(self.handler_id, "Received: ", data)
 			split = data.split()
 			if split[0] in message_parsers:
 				message_parsers[split[0]](split)
@@ -34,6 +37,9 @@ class SubDebugHandler(asyncore.dispatcher):
 			print("Sending: ", msg)
 			self.send(msg)
 
+	#def handle_close(self):
+	#	print(self.handler_id, "Closing handler.")
+
 	def handle_error(self):
 		raise
 
@@ -41,8 +47,10 @@ class SubDebugHandler(asyncore.dispatcher):
 # before passing them to an instance of SubDebugHandler
 class SubDebugServer(asyncore.dispatcher):
 
+
 	def __init__(self, host, port):
 		asyncore.dispatcher.__init__(self)
+		self.handler_id = 0
 		self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
 		self.set_reuse_addr()
 		self.bind((host, port))
@@ -54,7 +62,7 @@ class SubDebugServer(asyncore.dispatcher):
 		if pair is not None:
 			(conn_sock, client_address) = pair
 			print("Incoming connection: ", client_address)
-			SubDebugHandler(conn_sock)
+			SubDebugHandler(conn_sock, ++self.handler_id)
 
 	def handle_close(self):
 		print("Closing server.")
@@ -78,8 +86,9 @@ class StepCommand(sublime_plugin.WindowCommand):
 # Lets the user step to the next line
 class SetBreakpointCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
+		print(self.view.file_name())
 		#view = sublime.Window.active_view(sublime.active_window())
-		view_name = self.view.file_name().split("\\")[-1]
+		view_name = self.view.file_name().replace("\\","/").split("/")[-1]
 		row,_ = self.view.rowcol(self.view.sel()[0].begin())
 		print("Setting breakpoint...")
 		msg_queue.put("SETB {0} {1}\n".format(view_name, row + 1).encode('latin-1'))
@@ -117,7 +126,7 @@ class StateHandler():
 	# Gets all available views in sublime and adds the missing ones to the state
 	def add_missing_views(self):
 		views = [v for v in sum([w.views() for w in sublime.windows()], [])]
-		self.views = {v.file_name().split("\\")[-1]:v for v in views}
+		self.views = {v.file_name().replace("\\","/").split("/")[-1]:v for v in views}
 		for view_name, view in self.views.items():
 			if view_name not in self.state:
 				self.state[view_name] = []
@@ -125,7 +134,7 @@ class StateHandler():
 	# Updates all views with the available state-objects using the
 	# assigned functions
 	def update_regions(self):
-
+		self.add_missing_views()
 		# Iterate over all files in the state
 		for view_name,regions in self.state.items():
 			# Remove all old regions
@@ -157,12 +166,21 @@ class StateHandler():
 			self.state.setdefault(view_name, [])
 			self.state[view_name].append(("breakpoint", line_number))
 			self.update_regions()
+
+	def breakpoints(self):
+		ret = []
+		for k,v in self.state.items():
+			for t in v:
+				if t[0] == "breakpoint":
+					ret.append((k,t[1]))
+		return ret
+
 		
 	views = {}
 	state = {}
 	region_types = {
-		"breakpoint": ("keyword", "circle"),
 		"line_marker": ("keyword", "bookmark"),
+		"breakpoint": ("keyword", "circle"),
 	}
 
 def plugin_unloaded():
