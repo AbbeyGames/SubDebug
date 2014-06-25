@@ -71,7 +71,6 @@ class SubDebugServer(asyncore.dispatcher):
 		if pair is not None:
 			(conn_sock, client_address) = pair
 			print("Incoming connection: ", client_address)
-			ID = ID + 1
 			SubDebugHandler(conn_sock)
 
 	def handle_close(self):
