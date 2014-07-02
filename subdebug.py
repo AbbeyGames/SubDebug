@@ -7,17 +7,23 @@ import threading
 import queue
 import asyncore
 import socket
+from itertools import chain
+import re
+
+settings = sublime.load_settings("subdebug")
 
 TCP_IP = '127.0.0.1'
 TCP_PORT = 8172
 BUFFER_SIZE = 1024
+
+BASEDIR = settings.get("basedir", "")
 
 # Handles incoming and outgoing messages for the MobDebug client
 class SubDebugHandler(asyncore.dispatcher):
 	def __init__(self, socket, handler_id):
 		asyncore.dispatcher.__init__(self, socket)
 		self.handler_id = handler_id
-		msg_queue.put(b"STEP\n")
+		msg_queue.put(b"RUN\n")
 		for view_name,row in state_handler.breakpoints():
 			msg_queue.put("SETB {0} {1}\n".format(view_name, row).encode('latin-1'))
 
@@ -37,16 +43,12 @@ class SubDebugHandler(asyncore.dispatcher):
 			print("Sending: ", msg)
 			self.send(msg)
 
-	#def handle_close(self):
-	#	print(self.handler_id, "Closing handler.")
-
 	def handle_error(self):
 		raise
 
 # Starts listening on TCP_PORT and accepts incoming connections
 # before passing them to an instance of SubDebugHandler
 class SubDebugServer(asyncore.dispatcher):
-
 
 	def __init__(self, host, port):
 		asyncore.dispatcher.__init__(self)
@@ -86,20 +88,41 @@ class StepCommand(sublime_plugin.WindowCommand):
 # Lets the user step to the next line
 class SetBreakpointCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
-		print(self.view.file_name())
-		#view = sublime.Window.active_view(sublime.active_window())
-		view_name = self.view.file_name().replace("\\","/").split("/")[-1]
+		view_name = simplify_path(self.view.file_name())
 		row,_ = self.view.rowcol(self.view.sel()[0].begin())
-		print("Setting breakpoint...")
+		print("Setting breakpoint:", view_name, row)
 		msg_queue.put("SETB {0} {1}\n".format(view_name, row + 1).encode('latin-1'))
 		state_handler.set_breakpoint(view_name, row + 1)
 
+# Lets the user pick a base directory from where the lua is executed
+class SetBasedirCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		# Ran if the user want to choose their own base directory
+		def choose_other(path):
+			global BASEDIR
+			path.replace("\\","/")
+			BASEDIR = path
+			if(BASEDIR[-1] != "/"):
+				BASEDIR += "/"
+			print("BASEDIR:", BASEDIR)
+
+		# Ran if the user has chosen a base directory option
+		def selected_folder(index):
+			global BASEDIR
+			if index != -1: # The last option lets the user choose a base dir themself
+				if(index == len(folders)-1):
+					sublime.active_window().show_input_panel("Give the base directory path.", BASEDIR, choose_other, None, None)
+				else:
+					BASEDIR = folders[index] + "/"
+					state_handler.clear_state()
+					print("BASEDIR:", BASEDIR)
+		folders = list(chain.from_iterable([w.folders() for w in sublime.windows()]))
+		folders.insert(len(folders), "Choose other directory...")
+		sublime.active_window().show_quick_panel(folders, selected_folder)
 
 #=========Incomming message parsers=========#
 # Called when the "202 Paused" message is received
 def paused_command(args):
-	print(args[2])
-	print(args[3])
 	state_handler.set_line_marker(args[2].decode("utf-8"), int(args[3]))
 
 # Mapping from incomming messages to the functions that parse them
@@ -118,15 +141,14 @@ class StateHandler():
 		self.update_regions()
 
 	def clear_state(self):
-		self.state = {
-			#"client.lua": [("breakpoint", 6)],
-		}
-		self.add_missing_views()
+		self.state = {}
+		self.update_regions()
 
 	# Gets all available views in sublime and adds the missing ones to the state
 	def add_missing_views(self):
 		views = [v for v in sum([w.views() for w in sublime.windows()], [])]
-		self.views = {v.file_name().replace("\\","/").split("/")[-1]:v for v in views}
+		self.views = {simplify_path(v.file_name()):v for v in views if v.file_name() != None}
+		print(self.views)
 		for view_name, view in self.views.items():
 			if view_name not in self.state:
 				self.state[view_name] = []
@@ -135,6 +157,7 @@ class StateHandler():
 	# assigned functions
 	def update_regions(self):
 		self.add_missing_views()
+
 		# Iterate over all files in the state
 		for view_name,regions in self.state.items():
 			# Remove all old regions
@@ -175,17 +198,20 @@ class StateHandler():
 					ret.append((k,t[1]))
 		return ret
 
-		
 	views = {}
 	state = {}
 	region_types = {
-		"line_marker": ("keyword", "bookmark"),
 		"breakpoint": ("keyword", "circle"),
+		"line_marker": ("keyword", "bookmark"),
 	}
 
 def plugin_unloaded():
+	settings.set("basedir", BASEDIR)
 	print("Closing down the server...")
 	server.close()
+
+def simplify_path(path):
+	return path.replace("\\","/").replace(BASEDIR,"").split(".")[-2]
 
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
@@ -195,4 +221,5 @@ state_handler = StateHandler()
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
 thread = threading.Thread(target=asyncore.loop, kwargs={"use_poll": True})
-thread.start()
+thread.start
+
