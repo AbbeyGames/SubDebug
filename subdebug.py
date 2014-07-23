@@ -3,6 +3,7 @@
 
 import sublime, sublime_plugin
 
+import os
 import threading
 import queue
 import asyncore
@@ -17,13 +18,14 @@ TCP_PORT = 8172
 BUFFER_SIZE = 1024
 
 BASEDIR = settings.get("basedir", "")
+STEP_ON_CONNECT = settings.get("step_on_connect", False)
 
 # Handles incoming and outgoing messages for the MobDebug client
 class SubDebugHandler(asyncore.dispatcher):
 	def __init__(self, socket, handler_id):
 		asyncore.dispatcher.__init__(self, socket)
 		self.handler_id = handler_id
-		msg_queue.put(b"RUN\n")
+		msg_queue.put(b"STEP\n" if STEP_ON_CONNECT else b"RUN\n")
 		for view_name,row in state_handler.breakpoints():
 			msg_queue.put("SETB {0} {1}\n".format(view_name, row).encode('latin-1'))
 
@@ -100,8 +102,7 @@ class SetBasedirCommand(sublime_plugin.WindowCommand):
 		# Ran if the user want to choose their own base directory
 		def choose_other(path):
 			global BASEDIR
-			path.replace("\\","/")
-			BASEDIR = path
+			BASEDIR = path.replace('\\','/')
 			if(BASEDIR[-1] != "/"):
 				BASEDIR += "/"
 			print("BASEDIR:", BASEDIR)
@@ -119,6 +120,16 @@ class SetBasedirCommand(sublime_plugin.WindowCommand):
 		folders = list(chain.from_iterable([w.folders() for w in sublime.windows()]))
 		folders.insert(len(folders), "Choose other directory...")
 		sublime.active_window().show_quick_panel(folders, selected_folder)
+
+# Lets the user step to the next line
+class ToggleStepOnConnectCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		global STEP_ON_CONNECT
+		STEP_ON_CONNECT = not STEP_ON_CONNECT
+		print("Step on connect:", STEP_ON_CONNECT)
+
+	def is_checked(self):
+		return STEP_ON_CONNECT or False
 
 #=========Incomming message parsers=========#
 # Called when the "202 Paused" message is received
@@ -176,6 +187,8 @@ class StateHandler():
 				self.views[view_name].add_regions(reg_name, v, *self.region_types[reg_name])
 
 	def set_line_marker(self, view_name, line_number):
+		view_name = simplify_path(view_name)
+		print("Setting line marker:", view_name, line_number)
 		self.add_missing_views()
 		if view_name in self.views:
 			self.state.setdefault(view_name, [])
@@ -207,11 +220,13 @@ class StateHandler():
 
 def plugin_unloaded():
 	settings.set("basedir", BASEDIR)
+	settings.set("step_on_connect", STEP_ON_CONNECT)
 	print("Closing down the server...")
 	server.close()
 
 def simplify_path(path):
-	return path.replace("\\","/").replace(BASEDIR,"").split(".")[-2]
+	path = path.replace("\\","/").replace(BASEDIR,"")
+	path = re.sub('\.lua$', '', path) # Strip ".lua" from the path
 
 # Open a threadsafe message queue
 msg_queue = queue.Queue()
@@ -220,6 +235,10 @@ state_handler = StateHandler()
 
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
-thread = threading.Thread(target=asyncore.loop, kwargs={"use_poll": True})
+
+if os.name == "posix":
+	thread = threading.Thread(target=asyncore.loop, kwargs={"use_poll": True})
+else:
+	thread = threading.Thread(target=asyncore.loop)
 thread.start
 
