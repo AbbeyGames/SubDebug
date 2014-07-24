@@ -96,6 +96,11 @@ class SetBreakpointCommand(sublime_plugin.TextCommand):
 		msg_queue.put("SETB {0} {1}\n".format(view_name, row + 1).encode('latin-1'))
 		state_handler.set_breakpoint(view_name, row + 1)
 
+# Lets the user step to the next line
+class RemoveBreakpointCommand(sublime_plugin.TextCommand):
+	def run(self, edit):
+		pass
+
 # Lets the user pick a base directory from where the lua is executed
 class SetBasedirCommand(sublime_plugin.WindowCommand):
 	def run(self):
@@ -118,6 +123,7 @@ class SetBasedirCommand(sublime_plugin.WindowCommand):
 					state_handler.clear_state()
 					print("BASEDIR:", BASEDIR)
 		folders = list(chain.from_iterable([w.folders() for w in sublime.windows()]))
+		folders = [f.replace("\\", "/") for f in folders]
 		folders.insert(len(folders), "Choose other directory...")
 		sublime.active_window().show_quick_panel(folders, selected_folder)
 
@@ -203,6 +209,9 @@ class StateHandler():
 			self.state[view_name].append(("breakpoint", line_number))
 			self.update_regions()
 
+	def remove_breakpoint(self, view_name, line_number):
+		pass
+
 	def breakpoints(self):
 		ret = []
 		for k,v in self.state.items():
@@ -227,6 +236,7 @@ def plugin_unloaded():
 def simplify_path(path):
 	path = path.replace("\\","/").replace(BASEDIR,"")
 	path = re.sub('\.lua$', '', path) # Strip ".lua" from the path
+	return path
 
 # Open a threadsafe message queue
 msg_queue = queue.Queue()

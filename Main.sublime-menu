@@ -21,6 +21,11 @@
 				"caption": "Set Breakpoint...",
 				"mnemonic": "B"
 			},
+			{ 
+				"command": "remove_breakpoint",
+				"caption": "Remove Breakpoint...",
+				"mnemonic": "e"
+			},
             { "caption": "-" },
 			{ 
 				"command": "set_basedir",
