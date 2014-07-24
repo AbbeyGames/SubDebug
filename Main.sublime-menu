@@ -7,23 +7,30 @@
 		[
 			{ 
 				"command": "run",
-				"caption": "Run until Breakpoint",
+				"caption": "Run until Breakpoint...",
 				"mnemonic": "R"
 			},
 			{ 
 				"command": "step",
-				"caption": "Step to Next Line",
+				"caption": "Step to Next Line...",
 				"mnemonic": "S"
 			},
+            { "caption": "-" },
 			{ 
 				"command": "set_breakpoint",
-				"caption": "Set Breakpoint",
+				"caption": "Set Breakpoint...",
 				"mnemonic": "B"
 			},
+            { "caption": "-" },
 			{ 
 				"command": "set_basedir",
-				"caption": "Change Base Directory",
+				"caption": "Change Base Directory...",
 				"mnemonic": "D"
+			},
+			{ 
+				"command": "toggle_step_on_connect",
+				"caption": "Step on Connect",
+				"checkbox": true
 			}
 
 
