@@ -3,6 +3,7 @@
 
 import sublime, sublime_plugin
 
+import os
 import threading
 import queue
 import asyncore
@@ -220,6 +221,9 @@ state_handler = StateHandler()
 
 # Start listening and open the asyncore loop
 server = SubDebugServer(TCP_IP, TCP_PORT)
-thread = threading.Thread(target=asyncore.loop, kwargs={"use_poll": True})
-thread.start
+if os.name == "posix":
+	thread = threading.Thread(target=asyncore.loop, kwargs={"use_poll": True})
+else:
+	thread = threading.Thread(target=asyncore.loop)
+thread.start()
 
