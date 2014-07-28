@@ -96,6 +96,13 @@ class ToggleBreakpointCommand(sublime_plugin.TextCommand):
 		print("Toggling breakpoint:", view_name, row)
 		state_handler.toggle_breakpoint(view_name, row + 1)
 
+# Lets the user evaluate a statement
+class EvaluateStatementCommand(sublime_plugin.TextCommand):
+	def run(self, edit):        
+		for region in self.view.sel():
+			text = self.view.substr(region)
+			msg_queue.put("EVAL \"{0}\"\n".format(text).encode('latin-1'))
+
 # Lets the user pick a base directory from where the lua is executed
 class SetBasedirCommand(sublime_plugin.WindowCommand):
 	def run(self):
