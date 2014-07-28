@@ -17,14 +17,9 @@
 			},
             { "caption": "-" },
 			{ 
-				"command": "set_breakpoint",
-				"caption": "Set Breakpoint...",
+				"command": "toggle_breakpoint",
+				"caption": "Toggle Breakpoint...",
 				"mnemonic": "B"
-			},
-			{ 
-				"command": "remove_breakpoint",
-				"caption": "Remove Breakpoint...",
-				"mnemonic": "e"
 			},
             { "caption": "-" },
 			{ 

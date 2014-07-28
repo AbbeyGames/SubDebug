@@ -9,6 +9,6 @@
 	},
 	{ 
 		"keys": ["ctrl+f8"], 
-		"command": "set_breakpoint"
+		"command": "toggle_breakpoint"
 	},
 ]

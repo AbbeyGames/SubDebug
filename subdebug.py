@@ -80,6 +80,7 @@ class RunCommand(sublime_plugin.WindowCommand):
 	def run(self):
 		print("Running until breakpoint...")
 		msg_queue.put(b"RUN\n")
+		state_handler.remove_line_marker()
 
 # Lets the user step to the next line
 class StepCommand(sublime_plugin.WindowCommand):
@@ -88,18 +89,12 @@ class StepCommand(sublime_plugin.WindowCommand):
 		msg_queue.put(b"STEP\n")
 
 # Lets the user step to the next line
-class SetBreakpointCommand(sublime_plugin.TextCommand):
+class ToggleBreakpointCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
 		view_name = simplify_path(self.view.file_name())
 		row,_ = self.view.rowcol(self.view.sel()[0].begin())
-		print("Setting breakpoint:", view_name, row)
-		msg_queue.put("SETB {0} {1}\n".format(view_name, row + 1).encode('latin-1'))
-		state_handler.set_breakpoint(view_name, row + 1)
-
-# Lets the user step to the next line
-class RemoveBreakpointCommand(sublime_plugin.TextCommand):
-	def run(self, edit):
-		pass
+		print("Toggling breakpoint:", view_name, row)
+		state_handler.toggle_breakpoint(view_name, row + 1)
 
 # Lets the user pick a base directory from where the lua is executed
 class SetBasedirCommand(sublime_plugin.WindowCommand):
@@ -184,14 +179,16 @@ class StateHandler():
 			region_sets = {}
 			# Iterate over all regions in that file
 			for (reg_type,line) in regions:
-				if reg_type not in region_sets:
-					region_sets[reg_type] = []
-				region_sets[reg_type].append(sublime.Region(self.views[view_name].text_point(line-1, 0)))
+				if reg_type == "line_marker" or ("line_marker", line) not in regions:
+					if reg_type not in region_sets:
+						region_sets[reg_type] = []
+					region_sets[reg_type].append(sublime.Region(self.views[view_name].text_point(line-1, 0)))
 			
-			# Register the new regions with sublime
+			# Register all new regions except the line-marker with sublime
 			for reg_name,v in region_sets.items():
+				print("Adding region:", view_name, reg_name, v)
 				self.views[view_name].add_regions(reg_name, v, *self.region_types[reg_name])
-
+	
 	def set_line_marker(self, view_name, line_number):
 		view_name = simplify_path(view_name)
 		print("Setting line marker:", view_name, line_number)
@@ -202,15 +199,27 @@ class StateHandler():
 			self.state[view_name].append(("line_marker", line_number))
 			self.update_regions()
 
-	def set_breakpoint(self, view_name, line_number):
+	def remove_line_marker(self):
+		for name,view in self.state.items():
+			self.state[name] = [(t,n) for t,n in view if t != "line_marker"]
+		self.update_regions()
+
+	def toggle_breakpoint(self, view_name, line_number):
 		self.add_missing_views()
-		if view_name in self.views:
-			self.state.setdefault(view_name, [])
-			self.state[view_name].append(("breakpoint", line_number))
-			self.update_regions()
+		if view_name in self.views and ("breakpoint", line_number) in self.state[view_name]:
+			self.remove_breakpoint(view_name, line_number)
+		else:
+			self.set_breakpoint(view_name, line_number)
+		self.update_regions()
+
+	def set_breakpoint(self, view_name, line_number):
+		self.state.setdefault(view_name, [])
+		self.state[view_name].append(("breakpoint", line_number))
+		msg_queue.put("SETB {0} {1}\n".format(view_name, line_number).encode('latin-1'))
 
 	def remove_breakpoint(self, view_name, line_number):
-		pass
+		self.state[view_name].remove(("breakpoint", line_number))
+		msg_queue.put("DELB {0} {1}\n".format(view_name, line_number).encode('latin-1'))
 
 	def breakpoints(self):
 		ret = []
