@@ -15,7 +15,9 @@ settings = sublime.load_settings("subdebug")
 
 TCP_IP = '127.0.0.1'
 TCP_PORT = 8172
-BUFFER_SIZE = 1024
+BUFFER_SIZE = 2048
+
+MESSAGE_BUFFER = queue.Queue()
 
 BASEDIR = settings.get("basedir", "")
 STEP_ON_CONNECT = settings.get("step_on_connect", False)
@@ -32,12 +34,19 @@ class SubDebugHandler(asyncore.dispatcher):
 	# Reads the message-code of incomming messages and passes 
 	# them to the right function
 	def handle_read(self):
-		data = self.recv(BUFFER_SIZE)
-		if data:
-			print(self.handler_id, "Received: ", data)
-			split = data.split()
-			if split[0] in message_parsers:
-				message_parsers[split[0]](split)
+		incomming = self.recv(BUFFER_SIZE).decode("utf-8")
+		if incomming:
+			global MESSAGE_BUFFER
+			for item in incomming.split("\n"):
+				MESSAGE_BUFFER.put(item)
+
+			while(not MESSAGE_BUFFER.empty()):
+				data = MESSAGE_BUFFER.get(True)
+				if len(data)>0:
+					print(self.handler_id, "Received: ", data)
+					split = data.split()
+					if split[0] in message_parsers:
+						message_parsers[split[0]](split)
 
 	def handle_write(self):
 		if not msg_queue.empty():
@@ -101,7 +110,8 @@ class EvaluateStatementCommand(sublime_plugin.TextCommand):
 	def run(self, edit):        
 		for region in self.view.sel():
 			text = self.view.substr(region)
-			msg_queue.put("EVAL \"{0}\"\n".format(text).encode('latin-1'))
+			msg_queue.put(b"RUN\n")
+			msg_queue.put("EXEC return {0}\n".format(text).encode('latin-1'))
 
 # Lets the user pick a base directory from where the lua is executed
 class SetBasedirCommand(sublime_plugin.WindowCommand):
@@ -142,11 +152,21 @@ class ToggleStepOnConnectCommand(sublime_plugin.WindowCommand):
 #=========Incomming message parsers=========#
 # Called when the "202 Paused" message is received
 def paused_command(args):
-	state_handler.set_line_marker(args[2].decode("utf-8"), int(args[3]))
+	state_handler.set_line_marker(args[2], int(args[3]))
+
+def ok_command(args):
+	global MESSAGE_BUFFER
+	if len(args) == 3:
+		data = MESSAGE_BUFFER.get(True)
+		if len(data) > 0:
+			print("Evaluation return:", data.strip("do local _={").strip("};return _;end"))
+		else:
+			print("Problem receiving evaluation return.")
 
 # Mapping from incomming messages to the functions that parse them
 message_parsers = { 
-	b"202": paused_command,
+	"202": paused_command,
+	"200": ok_command,
 }
 #===========================================#
 
