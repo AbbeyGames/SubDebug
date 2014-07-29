@@ -158,8 +158,21 @@ def ok_command(args):
 	global MESSAGE_BUFFER
 	if len(args) == 3:
 		data = MESSAGE_BUFFER.get(True)
+		data = data[0:int(args[2])]
 		if len(data) > 0:
-			print("Evaluation return:", data.strip("do local _={").strip("};return _;end"))
+			
+			output_panel = sublime.active_window().create_output_panel("SubDebug")
+			sublime.active_window().run_command("show_panel", {"panel": "output.SubDebug"})
+			
+			data = data.strip("do local _={").strip("};return _;end") #Strip the ends
+			data = data.replace("{", "{\n").replace("}", "\n}")
+			data = data.replace("\n\n", "")
+			data = data.replace(", ", "\n").replace("--", "\n\t--")
+			data = data[1:-1]
+			output_panel.set_read_only(False)
+			output_panel.run_command("append", {"characters" : data})
+			output_panel.set_read_only(True)
+			
 		else:
 			print("Problem receiving evaluation return.")
 
