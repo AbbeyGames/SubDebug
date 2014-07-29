@@ -11,4 +11,8 @@
 		"keys": ["ctrl+f8"], 
 		"command": "toggle_breakpoint"
 	},
+	{ 
+		"keys": ["ctrl+f7"], 
+		"command": "evaluate_statement"
+	},
 ]
