@@ -7,6 +7,20 @@ SubDebug
 	Platform:			Sublime Text 3 (current development)                  
 	Initiating author:	Abbey Games (www.abbeygames.com), Yuri van Geffen     
 	
+Current features:
+========
+* Step, Run and Break your way through code.
+* Evaluate code by selecting code and clicking "Evaluate Statement...".
+* Windows shortcuts.
+
+Features to come:
+========
+* Watches.
+* More detailed evaluation (visualization).
+* Stacktraces.
+* Mac and Linux shortcuts.
+* More...?
+	
 How to install
 ========
 * Check out this repository to your package path, on Windows it will be something like this: `C:/Users/[NAME]/AppData/Roaming/Sublime Text 3/Packages/[CHOOSE A GOOD NAME, E.G. "subdebug"]`
